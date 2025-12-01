@@ -1,0 +1,24 @@
+# Tasks
+
+- [x] Requirements Definition <!-- id: 0 -->
+    - [x] Draft requirements document based on strategy slides <!-- id: 1 -->
+    - [x] User review of requirements <!-- id: 2 -->
+- [/] Implementation Planning <!-- id: 3 -->
+    - [x] Create implementation plan document <!-- id: 10 -->
+    - [x] Update plan with TDD strategy <!-- id: 12 -->
+    - [ ] User review of implementation plan <!-- id: 11 -->
+- [ ] Implementation (TDD) <!-- id: 4 -->
+    - [ ] Setup Project Structure & Environment <!-- id: 13 -->
+    - [ ] Data Ingestion Module <!-- id: 5 -->
+        - [ ] Write Tests (`tests/test_data_loader.py`) <!-- id: 14 -->
+        - [ ] Implement Code (`src/data_loader.py`) <!-- id: 15 -->
+    - [ ] Strategy Module <!-- id: 6 -->
+        - [ ] Write Tests (`tests/test_strategy.py`) <!-- id: 16 -->
+        - [ ] Implement Code (`src/strategy.py`) <!-- id: 17 -->
+    - [ ] Portfolio Module <!-- id: 18 -->
+        - [ ] Write Tests (`tests/test_portfolio.py`) <!-- id: 19 -->
+        - [ ] Implement Code (`src/portfolio.py`) <!-- id: 20 -->
+    - [ ] Backtesting Engine <!-- id: 8 -->
+        - [ ] Write Tests (`tests/test_backtester.py`) <!-- id: 21 -->
+        - [ ] Implement Code (`src/backtester.py`) <!-- id: 22 -->
+- [ ] Verification <!-- id: 9 -->
