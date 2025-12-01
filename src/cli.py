@@ -281,19 +281,26 @@ class CliApp:
             # Create executor (for live mode)
             elif self.mode == "live":
                 logger.info("Live mode: Setting up executor")
-                executor = Executor(
+                
+                from src.live_executor import LiveExecutor
+                from src.scheduler import TradingScheduler
+                
+                # Initialize LiveExecutor
+                executor = LiveExecutor(
                     config,
-                    starting_capital=self.starting_capital,
-                    mode=ExecutionMode.LIVE,
+                    dry_run=self.dry_run
                 )
-                logger.info("Executor initialized for live trading")
+                logger.info("LiveExecutor initialized")
 
-                if self.dry_run:
-                    logger.info("DRY RUN: Not executing live trades")
-                    return 0
-
-                logger.info("Live trading enabled")
-
+                # Initialize Scheduler
+                scheduler = TradingScheduler(config, executor)
+                
+                logger.info("Starting Live Trading Scheduler...")
+                logger.info("Press Ctrl+C to stop")
+                
+                # Start scheduler (blocking)
+                scheduler.start()
+                
             # Create output directory
             output_path = Path(self.output_dir)
             output_path.mkdir(parents=True, exist_ok=True)
@@ -302,6 +309,9 @@ class CliApp:
             logger.info(f"Trading system completed at {get_utc_timestamp()}")
             return 0
 
+        except KeyboardInterrupt:
+            logger.info("Live trading stopped by user")
+            return 0
         except FileNotFoundError as e:
             logger.error(f"File not found: {e}")
             return 1
