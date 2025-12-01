@@ -16,6 +16,7 @@ class WFOSplit:
         df: pd.DataFrame,
         is_window_days: int = 730,
         oos_window_days: int = 90,
+        lookback_days: int = 0,
     ):
         """Initialize WFO split.
 
@@ -23,6 +24,7 @@ class WFOSplit:
             df: DataFrame with OHLCV data
             is_window_days: In-Sample window size (days)
             oos_window_days: Out-of-Sample window size (days)
+            lookback_days: Lookback period for OOS indicator calculation (days)
 
         Raises:
             TypeError: If df is None
@@ -46,9 +48,14 @@ class WFOSplit:
 
         # Split into IS and OOS windows
         self.is_df = df.iloc[:is_window_days].reset_index(drop=True)
-        self.oos_df = df.iloc[is_window_days:is_window_days + oos_window_days].reset_index(drop=True)
+        
+        # OOS window needs lookback data for indicator calculation
+        oos_start_idx = max(0, is_window_days - lookback_days)
+        self.oos_df = df.iloc[oos_start_idx:is_window_days + oos_window_days].reset_index(drop=True)
+        
         self.is_window_days = is_window_days
         self.oos_window_days = oos_window_days
+        self.lookback_days = is_window_days - oos_start_idx
 
 
 class BacktestMetrics:
@@ -220,6 +227,21 @@ class Backtester:
                         else:  # SHORT
                             trade_return = (entry_price - current_price) / entry_price
 
+                        # Apply Leverage
+                        leverage = self.config.get("execution", {}).get("leverage", 1.0)
+                        trade_return *= leverage
+
+                        # Apply Fees and Slippage (Round trip: Entry + Exit)
+                        # Fees scale with leverage (applied to notional value)
+                        fee_pct = self.config.get("execution", {}).get("fee_pct", 0.1)
+                        slippage_pct = self.config.get("execution", {}).get("slippage_pct", 0.05)
+                        
+                        # Total cost percentage relative to capital
+                        # (Fee + Slippage) * 2 (Entry/Exit) * Leverage
+                        total_cost_pct = (fee_pct + slippage_pct) * 2 * leverage / 100.0
+                        
+                        trade_return -= total_cost_pct
+
                         # Apply the return across the trade period
                         if entry_idx is not None:
                             trade_length = i - entry_idx
@@ -284,8 +306,18 @@ class Backtester:
                 f"Insufficient data: {len(df)} days < {min_required} days minimum"
             )
 
-        # Create WFO split
-        wfo = WFOSplit(df, is_window_days=is_window_days, oos_window_days=oos_window_days)
+        # Determine lookback period from strategy config
+        strategy_config = self.config.get("strategy", {})
+        lookback = max(strategy_config.get("trend_window", 200),
+                      strategy_config.get("short_window", 20))
+
+        # Create WFO split with lookback
+        wfo = WFOSplit(
+            df, 
+            is_window_days=is_window_days, 
+            oos_window_days=oos_window_days,
+            lookback_days=lookback
+        )
 
         # Calculate strategy-based returns for each window
         # Phase 11-C: Use strategy signals for active trading instead of buy-and-hold
@@ -293,7 +325,10 @@ class Backtester:
         is_returns = self._simulate_strategy_trades(wfo.is_df)
 
         logger.info("Simulating Out-of-Sample trading with strategy signals...")
-        oos_returns = self._simulate_strategy_trades(wfo.oos_df)
+        # OOS simulation returns full array including lookback
+        oos_returns_full = self._simulate_strategy_trades(wfo.oos_df)
+        # Slice to get only the actual OOS period returns
+        oos_returns = oos_returns_full[wfo.lookback_days:]
 
         # Calculate ending values
         is_end_value = self.starting_capital * np.prod(1 + is_returns)
@@ -362,6 +397,14 @@ class Backtester:
         # Simplified: reduce returns by cost percentage
         cost_pct = (fee_pct + slippage_pct) / 100.0
         adjusted_returns = returns - cost_pct
+
+        # Apply leverage if configured
+        leverage = self.config.get("execution", {}).get("leverage", 1.0)
+        if leverage > 1.0:
+            # Leverage magnifies returns (both positive and negative)
+            # Note: This is a simplified simulation that assumes constant leverage
+            # and doesn't account for borrowing costs or liquidation risk
+            adjusted_returns = adjusted_returns * leverage
 
         return adjusted_returns
 

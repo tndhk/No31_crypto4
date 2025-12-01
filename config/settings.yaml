@@ -13,11 +13,11 @@ universe:
 
 # Strategy Parameters
 strategy:
-  trend_window: 100        # MA_Trend (long-term regime detection) - optimized for current market
-  short_window: 10         # MA_Short (Z-score base) - optimized for current market
-  z_entry: 1.5             # Entry threshold - optimized (was 2.0, which was too strict)
-  z_target: 1.0            # Take profit threshold
-  z_stop: 3.0              # Stop loss threshold
+  trend_window: 100        # MA_Trend (long-term regime detection)
+  short_window: 10         # MA_Short (Z-score base)
+  z_entry: 1.0             # Entry threshold (Aggressive: 1.5 -> 1.0)
+  z_target: 1.5            # Take profit threshold (Aggressive: 1.0 -> 1.5)
+  z_stop: 4.0              # Stop loss threshold (Wider: 3.0 -> 4.0)
 
 # Portfolio Configuration
 portfolio:
@@ -35,6 +35,7 @@ wfo:
 # Execution Configuration
 execution:
   mode: backtest           # backtest, live
+  leverage: 2.0            # Leverage multiplier (Simulated)
   fee_pct: 0.11            # Entry and exit fee (each)
   slippage_pct: 0.05       # Slippage (each)
   timezone: UTC

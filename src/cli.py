@@ -258,6 +258,14 @@ class CliApp:
                     logger.info(f"  Max Drawdown: {max_dd:.4f}%")
                     logger.info(f"  Total Return: {total_ret:.4f}%")
 
+                    # Extract Out-of-Sample metrics (validation)
+                    oos_metrics = wfo_results.get('oos_metrics')
+                    if oos_metrics:
+                        logger.info(f"OOS Validation Results:")
+                        logger.info(f"  Sharpe Ratio: {oos_metrics.sharpe_ratio:.4f}")
+                        logger.info(f"  Max Drawdown: {oos_metrics.max_drawdown_pct:.4f}%")
+                        logger.info(f"  Total Return: {oos_metrics.total_return_pct:.4f}%")
+
                     # Check Go/No-Go criteria (In-Sample must pass)
                     is_go = wfo_results.get('is_go', False)
                     if is_go:
