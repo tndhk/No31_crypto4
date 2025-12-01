@@ -1,0 +1,62 @@
+# Alt/BTC Ratio Trend-Following Strategy Configuration
+
+# Universe Configuration
+universe:
+  altcoins:
+    initial: [ETH, SOL, XRP, DOGE, ADA, DOT, MATIC, LTC]
+    min_symbols: 5
+    max_symbols: 50
+    volume_threshold_usd: 10000000  # 10M USD
+    volume_relaxation_pct: 10       # Relax by 10% if min not met
+  hedge: BTC
+  rebalance_frequency: quarterly    # quarterly, monthly
+
+# Strategy Parameters
+strategy:
+  trend_window: 200        # MA_Trend (long-term regime detection)
+  short_window: 20         # MA_Short (Z-score base)
+  z_entry: 2.0             # Entry threshold
+  z_target: 1.0            # Take profit threshold
+  z_stop: 3.0              # Stop loss threshold
+
+# Portfolio Configuration
+portfolio:
+  weight_method: risk_parity
+  weight_rebalance: monthly
+  hedge_beta_grid: [0.8, 0.9, 1.0, 1.1, 1.2]
+  hedge_update_frequency: quarterly
+
+# Walk-Forward Optimization Configuration
+wfo:
+  in_sample_days: 730      # 2 years
+  out_of_sample_days: 90   # 3 months
+  rolling_shift_days: 90   # 3 months
+
+# Execution Configuration
+execution:
+  mode: backtest           # backtest, live
+  fee_pct: 0.11            # Entry and exit fee (each)
+  slippage_pct: 0.05       # Slippage (each)
+  timezone: UTC
+  daily_batch_hour: 0      # UTC hour for daily batch
+
+# Data Configuration
+data:
+  source: ccxt
+  exchange: binance
+  timeframe: 1d
+  retry_attempts: 3
+  retry_backoff_initial_sec: 1
+  max_consecutive_gaps: 3
+  interpolation_method: ffill
+
+# Validation Thresholds
+validation:
+  min_sharpe_ratio: 1.0
+  max_drawdown_pct: 20.0
+
+# Logging
+logging:
+  audit_log_dir: logs
+  audit_log_permissions: 600
+  level: INFO
