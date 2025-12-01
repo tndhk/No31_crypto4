@@ -1,8 +1,11 @@
 """Walk-Forward Optimization backtester with metrics calculation"""
 
-from typing import Dict, Optional, Any, Tuple
+from typing import Dict, Optional, Any, Tuple, List
 import numpy as np
 import pandas as pd
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class WFOSplit:
@@ -159,6 +162,84 @@ class Backtester:
         self.config = config
         self.starting_capital = starting_capital
 
+    def _simulate_strategy_trades(self, df: pd.DataFrame) -> np.ndarray:
+        """Simulate trades based on strategy signals.
+
+        Args:
+            df: DataFrame with OHLCV data
+
+        Returns:
+            Array of daily returns including signal-based trades
+        """
+        from src.strategy import Strategy
+
+        strategy_config = self.config.get("strategy", {})
+        strategy = Strategy(strategy_config)
+
+        # Initialize returns array
+        returns = np.zeros(len(df))
+
+        # Track position state
+        current_position = None  # 'LONG' or 'SHORT'
+        entry_price = None
+        entry_idx = None
+        signal_count = 0
+
+        # Iterate through data to generate signals
+        for i in range(max(strategy_config.get("trend_window", 200),
+                          strategy_config.get("short_window", 20)), len(df)):
+            window_df = df.iloc[:i+1].copy()
+
+            try:
+                # Detect regime
+                regime = strategy.detect_regime(window_df)
+
+                # Generate signal
+                signal = strategy.generate_signal(window_df, regime)
+
+                if signal and signal.signal_type == "ENTRY":
+                    signal_count += 1
+                    current_price = df["close"].iloc[i]
+
+                    # Execute entry
+                    if signal.order_type == "BUY":
+                        current_position = "LONG"
+                        entry_price = current_price
+                        entry_idx = i
+                    elif signal.order_type == "SELL":
+                        current_position = "SHORT"
+                        entry_price = current_price
+                        entry_idx = i
+
+                elif signal and signal.signal_type == "EXIT":
+                    # Exit trade
+                    if current_position:
+                        current_price = df["close"].iloc[i]
+                        if current_position == "LONG":
+                            trade_return = (current_price - entry_price) / entry_price
+                        else:  # SHORT
+                            trade_return = (entry_price - current_price) / entry_price
+
+                        # Apply the return across the trade period
+                        if entry_idx is not None:
+                            trade_length = i - entry_idx
+                            if trade_length > 0:
+                                daily_return = trade_return / trade_length
+                                returns[entry_idx:i] = daily_return
+
+                        current_position = None
+                        entry_price = None
+                        entry_idx = None
+
+            except (ValueError, TypeError):
+                # Skip bars with insufficient data
+                continue
+
+        # Log signal count
+        logger.info(f"Strategy signals generated during backtest: {signal_count}")
+
+        return returns
+
     def walk_forward_optimize(
         self,
         df: pd.DataFrame,
@@ -206,9 +287,13 @@ class Backtester:
         # Create WFO split
         wfo = WFOSplit(df, is_window_days=is_window_days, oos_window_days=oos_window_days)
 
-        # Calculate returns for each window
-        is_returns = self._calculate_returns(wfo.is_df)
-        oos_returns = self._calculate_returns(wfo.oos_df)
+        # Calculate strategy-based returns for each window
+        # Phase 11-C: Use strategy signals for active trading instead of buy-and-hold
+        logger.info("Simulating In-Sample trading with strategy signals...")
+        is_returns = self._simulate_strategy_trades(wfo.is_df)
+
+        logger.info("Simulating Out-of-Sample trading with strategy signals...")
+        oos_returns = self._simulate_strategy_trades(wfo.oos_df)
 
         # Calculate ending values
         is_end_value = self.starting_capital * np.prod(1 + is_returns)

@@ -195,6 +195,19 @@ class CliApp:
 
             logger.info("Market data loaded successfully")
 
+            # Phase 11-B: Calculate Alt/BTC ratio for strategy analysis
+            logger.info("Computing ETH/BTC ratio...")
+            eth_btc_ratio = eth_data['close'] / btc_data['close']
+
+            # Create ratio DataFrame for WFO analysis
+            # This shifts analysis from absolute price to ratio, enabling better signal generation
+            ratio_df = btc_data.copy()
+            ratio_df['close'] = eth_btc_ratio
+            ratio_df['open'] = eth_data['open'] / btc_data['open']
+            ratio_df['high'] = eth_data['high'] / btc_data['high']
+            ratio_df['low'] = eth_data['low'] / btc_data['low']
+            logger.info(f"ETH/BTC ratio computed: {len(ratio_df)} records (range: {ratio_df['close'].min():.6f} to {ratio_df['close'].max():.6f})")
+
             # Create strategy
             logger.info("Initializing strategy")
             strategy = Strategy(config)
@@ -219,38 +232,35 @@ class CliApp:
 
                 logger.info("Running Walk-Forward Optimization with real data")
                 try:
-                    # Run WFO with BTC data as primary analysis asset
+                    # Run WFO with ETH/BTC ratio for Alt strategy analysis
                     # WFO splits data into 730-day In-Sample and 90-day Out-of-Sample windows
                     wfo_results = backtester.walk_forward_optimize(
-                        btc_data,
+                        ratio_df,
                         is_window_days=730,
                         oos_window_days=90
                     )
 
                     # Log key results
                     logger.info(f"WFO Results:")
-                    sharpe = wfo_results.get('sharpe_ratio', 0)
-                    max_dd = wfo_results.get('max_drawdown', 1)
-                    total_ret = wfo_results.get('total_return', 0)
 
-                    if sharpe != 'N/A':
-                        logger.info(f"  Sharpe Ratio: {sharpe:.4f}")
+                    # Extract In-Sample metrics (primary evaluation)
+                    is_metrics = wfo_results.get('is_metrics')
+                    if is_metrics:
+                        sharpe = is_metrics.sharpe_ratio
+                        max_dd = is_metrics.max_drawdown_pct
+                        total_ret = is_metrics.total_return_pct
                     else:
-                        logger.info(f"  Sharpe Ratio: {sharpe}")
+                        sharpe = 0.0
+                        max_dd = 100.0
+                        total_ret = 0.0
 
-                    if max_dd != 'N/A':
-                        logger.info(f"  Max Drawdown: {max_dd:.4%}")
-                    else:
-                        logger.info(f"  Max Drawdown: {max_dd}")
+                    logger.info(f"  Sharpe Ratio: {sharpe:.4f}")
+                    logger.info(f"  Max Drawdown: {max_dd:.4f}%")
+                    logger.info(f"  Total Return: {total_ret:.4f}%")
 
-                    if total_ret != 'N/A':
-                        logger.info(f"  Total Return: {total_ret:.4%}")
-                    else:
-                        logger.info(f"  Total Return: {total_ret}")
-
-                    # Check Go/No-Go criteria
-                    is_valid = wfo_results.get('is_valid', False)
-                    if is_valid:
+                    # Check Go/No-Go criteria (In-Sample must pass)
+                    is_go = wfo_results.get('is_go', False)
+                    if is_go:
                         logger.info("✓ Go/No-Go Criteria: PASS (Sharpe > 1.0 AND Drawdown < 20%)")
                     else:
                         logger.warning("✗ Go/No-Go Criteria: FAIL")

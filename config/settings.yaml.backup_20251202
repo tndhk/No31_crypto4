@@ -13,9 +13,9 @@ universe:
 
 # Strategy Parameters
 strategy:
-  trend_window: 100        # MA_Trend (long-term regime detection) - optimized for current market
-  short_window: 10         # MA_Short (Z-score base) - optimized for current market
-  z_entry: 1.5             # Entry threshold - optimized (was 2.0, which was too strict)
+  trend_window: 200        # MA_Trend (long-term regime detection)
+  short_window: 20         # MA_Short (Z-score base)
+  z_entry: 2.0             # Entry threshold
   z_target: 1.0            # Take profit threshold
   z_stop: 3.0              # Stop loss threshold
 
